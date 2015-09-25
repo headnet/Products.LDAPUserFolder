@@ -1,6 +1,13 @@
 Change log for Products.LDAPUserFolder
 ======================================
 
+2.27.eea (2015-09-25)
+---------------------
+- Switched to 'utf-8' default encoding [olimpiurob refs #28922]
+  (https://bugs.launchpad.net/ldapuserfolder/+bug/898921)
+- Do not convert 'jpegPhoto' binary attribute to unicode
+  [olimpiurob refs #28922]
+
 2.27 (2014-04-23)
 -----------------
 - fix mismatch between method name and security declaration

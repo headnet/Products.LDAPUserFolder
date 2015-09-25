@@ -30,6 +30,7 @@ from DateTime import DateTime
 # LDAPUserFolder package imports
 from Products.LDAPUserFolder.utils import encoding
 from Products.LDAPUserFolder.utils import _verifyUnicode
+from Products.LDAPUserFolder.utils import BINARY_ATTRIBUTES
 
 
 class NonexistingUser:
@@ -81,7 +82,7 @@ class LDAPUser(BasicUser):
             else:
                 prop = user_attrs.get(key, [None])[0]
 
-            if isinstance(prop, str) and key != 'objectGUID':
+            if isinstance(prop, str) and key.lower() not in BINARY_ATTRIBUTES:
                 prop = _verifyUnicode(prop)
 
             self._properties[key] = prop
