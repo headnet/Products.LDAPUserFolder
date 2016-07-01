@@ -16,10 +16,12 @@ $Id$
 """
 
 # General python imports
+import time
 import ldap
 from ldapurl import LDAPUrl
 from ldapurl import isLDAPUrl
 from ldap.dn import escape_dn_chars
+from ldap.controls import SimplePagedResultsControl
 from ldap.filter import filter_format
 import logging
 import random
@@ -351,9 +353,13 @@ class LDAPDelegate(Persistent):
               , attrs=[]
               , bind_dn=''
               , bind_pwd=''
-              , convert_filter=True
+              , page_size=10000
               ):
-        """ The main search engine """
+        """The main search engine.
+
+        Note that paging is used when necessary.
+        """
+
         result = { 'exception' : ''
                  , 'size' : 0
                  , 'results' : []
@@ -361,6 +367,7 @@ class LDAPDelegate(Persistent):
         if convert_filter:
             filter = to_utf8(filter)
         base = self._clean_dn(base)
+        t = time.time()
 
         try:
             connection = self.connect(bind_dn=bind_dn, bind_pwd=bind_pwd)
@@ -368,45 +375,63 @@ class LDAPDelegate(Persistent):
                 result['exception'] = 'Cannot connect to LDAP server'
                 return result
 
-            try:
-                res = connection.search_s(base, scope, filter, attrs)
-            except ldap.PARTIAL_RESULTS:
-                res_type, res = connection.result(all=0)
-            except ldap.REFERRAL, e:
-                connection = self.handle_referral(e)
+            paged_results_control = SimplePagedResultsControl(
+                criticality=True,
+                size=page_size,
+                cookie=''
+            )
 
-                try:
-                    res = connection.search_s(base, scope, filter, attrs)
-                except ldap.PARTIAL_RESULTS:
-                    res_type, res = connection.result(all=0)
+            page_ctrl_oid = SimplePagedResultsControl.controlType
+            serverctrls = [paged_results_control]
+            count = 0
 
-            for rec_dn, rec_dict in res:
-                # When used against Active Directory, "rec_dict" may not be
-                # be a dictionary in some cases (instead, it can be a list)
-                # An example of a useless "res" entry that can be ignored
-                # from AD is
-                # (None, ['ldap://ForestDnsZones.PORTAL.LOCAL/DC=ForestDnsZones,DC=PORTAL,DC=LOCAL'])
-                # This appears to be some sort of internal referral, but
-                # we can't handle it, so we need to skip over it.
-                try:
-                    items =  rec_dict.items()
-                except AttributeError:
-                    # 'items' not found on rec_dict
-                    continue
+            while True:
+                result_id = connection.search_ext(
+                    base, scope, filter, attrs,
+                    serverctrls=serverctrls, sizelimit=0
+                )
 
-                for key, value in items:
-                    if ( not isinstance(value, str) and 
-                         key.lower() not in BINARY_ATTRIBUTES ):
-                        try:
-                            for i in range(len(value)):
-                                value[i] = from_utf8(value[i])
-                        except:
-                            pass
+                result_type, result_data, _, result_ctrls = connection.result3(
+                    result_id
+                )
 
-                rec_dict['dn'] = from_utf8(rec_dn)
+                if result_type != ldap.RES_SEARCH_RESULT:
+                    break
 
-                result['results'].append(rec_dict)
-                result['size'] += 1
+                i = 0
+                for rec_dn, rec_dict in result_data:
+                    if not isinstance(rec_dict, dict):
+                        # When used against Active Directory,
+                        # "rec_dict" may not be be a dictionary in
+                        # some cases (instead, it can be a list)
+                        # An example of a useless "res" entry that
+                        # can be ignored from AD is (None,
+                        # ['ldap://.../DC=ForestDnsZones,DC=PORTAL,DC=LOCAL'])
+                        # This appears to be some sort of internal
+                        # referral, but we can't handle it, so we
+                        # need to skip over it.
+                        continue
+
+                    rec_dict['dn'] = from_utf8(rec_dn)
+                    result['results'].append(rec_dict)
+                    i += 1
+
+                count += i
+
+                for ctrl in result_ctrls:
+                    if ctrl.controlType == page_ctrl_oid and ctrl.cookie:
+                        paged_results_control.cookie = ctrl.cookie
+                        logger.info(
+                            "Retrieved %d results; requesting next page." % i
+                        )
+                        break
+                else:
+                    logger.info("Retrieved %d results; done (total: %d)." % (
+                        i, count
+                    ))
+                    break
+
+            result['size'] += count
 
         except ldap.INVALID_CREDENTIALS:
             msg = 'Invalid authentication credentials'
@@ -430,6 +455,10 @@ class LDAPDelegate(Persistent):
             msg = str(e)
             logger.error(msg, exc_info=1)
             result['exception'] = msg
+
+        elapsed = time.time() - t
+        if elapsed > 1.0:
+            logger.info("Search took %.1f seconds." % elapsed)
 
         return result
 

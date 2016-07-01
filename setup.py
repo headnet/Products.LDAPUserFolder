@@ -46,7 +46,7 @@ setup(name='Products.%s' % NAME,
         'setuptools',
         'Zope2',
         'dataflake.fakeldap',
-        'python-ldap',
+        'python-ldap >= 2.4',
         ],
       extras_require={
           'cmfldap': ['Products.CMFDefault >= 2.1.0'],

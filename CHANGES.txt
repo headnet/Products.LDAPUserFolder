@@ -1,6 +1,15 @@
 Change log for Products.LDAPUserFolder
 ======================================
 
+In next release ...
+
+- Use paging during search to overcome server size limit [malthe].
+
+  Note that this requires "python-ldap" version 2.4or better
+  (available since 2011) since we're using an API that changed with
+  this version.
+
+
 2.27.eea (2015-09-25)
 ---------------------
 - Switched to 'utf-8' default encoding [olimpiurob refs #28922]
