@@ -364,7 +364,7 @@ class LDAPDelegate(Persistent):
                  , 'size' : 0
                  , 'results' : []
                  }
-        if convert_filter:
+        if filter:
             filter = to_utf8(filter)
         base = self._clean_dn(base)
         t = time.time()
