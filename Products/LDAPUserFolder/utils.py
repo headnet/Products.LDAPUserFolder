@@ -38,7 +38,7 @@ except ImportError:
 # Constants used in other modules
 #################################################
 
-BINARY_ATTRIBUTES = ('objectguid', 'jpegphoto')
+BINARY_ATTRIBUTES = ('objectguid', 'jpegphoto', 'thumbnailphoto')
 
 HTTP_METHODS = ('GET', 'PUT', 'POST')
 
