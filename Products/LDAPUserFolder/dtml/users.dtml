@@ -221,7 +221,7 @@ function toggleSelect() {
               <span class="form-text"> n/a (binary value) </span>
             <dtml-else>
               <input type="text" size="50" name="&dtml-sk;" 
-                 value="<dtml-var "cur_val and ';'.join(cur_val) or ''">" />
+                 value="<dtml-var "cur_val and ';'.join(cur_val) or ''" html_quote=1>" />
             </dtml-if>
           </td>
         </tr>
