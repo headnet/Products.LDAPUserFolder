@@ -704,8 +704,8 @@ class LDAPUserFolder(BasicUserFolder):
             try to cache the result using 'value' as the key
         """
         if not value:
-            return None
-        
+            return
+
         cache_type = pwd and 'authenticated' or 'anonymous'
         negative_cache_key = '%s:%s:%s' % ( name
                                           , value
@@ -713,7 +713,7 @@ class LDAPUserFolder(BasicUserFolder):
                                           )
         if cache:
             if self._cache('negative').get(negative_cache_key) is not None:
-                return None
+                return
 
             cached_user = self._cache(cache_type).get(value, pwd)
 
@@ -724,22 +724,30 @@ class LDAPUserFolder(BasicUserFolder):
                 logger.debug(msg)
                 return cached_user
 
-        user_roles, user_dn, user_attrs, ldap_groups = self._lookupuserbyattr(
-            name=name, value=value, pwd=pwd
-            )
+        user_roles, user_dn, user_attrs, ldap_groups = self \
+            ._lookupuserbyattr(name=name, value=value, pwd=pwd)
+
+        if user_dn is not None and ldap_groups is None:
+            cache = 0
 
         if user_dn is None:
             logger.debug('getUserByAttr: "%s=%s" not found' % (name, value))
-            self._cache('negative').set(negative_cache_key, NonexistingUser())
-            return None
+            if cache:
+                self._cache('negative').set(
+                    negative_cache_key, NonexistingUser()
+                )
+            return
 
         if user_attrs is None:
             msg = 'getUserByAttr: "%s=%s" has no properties, bailing' % (
                 name, value
                 )
             logger.debug(msg)
-            self._cache('negative').set(negative_cache_key, NonexistingUser())
-            return None
+            if cache:
+                self._cache('negative').set(
+                    negative_cache_key, NonexistingUser()
+                )
+            return
 
         if user_roles is None or user_roles == self._roles:
             msg = 'getUserByAttr: "%s=%s" only has roles %s' % (
@@ -1252,11 +1260,9 @@ class LDAPUserFolder(BasicUserFolder):
 
             exc = res['exception']
             if exc:
-                if attr is None:
-                    group_list = (('', exc),)
-                else:
-                    group_list = (exc,)
-            elif res['size'] > 0:
+                return
+
+            if res['size'] > 0:
                 res_dicts = res['results']
                 for i in range(res['size']):
                     dn = res_dicts[i].get('dn')
