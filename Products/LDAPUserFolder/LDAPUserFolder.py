@@ -68,6 +68,9 @@ _marker = []
 _dtmldir = os.path.join(package_home(globals()), 'dtml')
 EDIT_PERMISSION = 'Change user folder'
 
+# Using this query field will search all applicable LDAP fields.
+ANY = "__any_field__"
+
 
 class LDAPUserFolder(BasicUserFolder):
     """
@@ -691,6 +694,7 @@ class LDAPUserFolder(BasicUserFolder):
         extra_filter = self.getProperty('_extra_user_filter')
         if extra_filter:
             user_filter_list.append(extra_filter)
+
         user_filter = '(&%s)' % ''.join(user_filter_list)
 
         return user_filter
@@ -1011,6 +1015,9 @@ class LDAPUserFolder(BasicUserFolder):
 
         schema_translator = {}
         for ldap_key, info in self.getSchemaConfig().items():
+            if info.get('binary', False):
+                continue
+
             public_name = info.get('public_name', None)
             friendly_name = info.get('friendly_name', None)
 
@@ -1039,6 +1046,11 @@ class LDAPUserFolder(BasicUserFolder):
                 else:
                     filt_list.append('(objectGUID=*%s*)' % guid)
 
+            elif search_param is ANY:
+                filt_list.append('(|%s)' % "".join(
+                    filter_format('(%s=%s)', (param, search_term))
+                    for param in attrs
+                ))
             else:
                 # If the keyword arguments contain unknown items we will
                 # simply ignore them and continue looking.
