@@ -1033,7 +1033,6 @@ class LDAPUserFolder(BasicUserFolder):
             if search_param == 'dn':
                 users_base = search_term
                 search_scope = self._delegate.BASE
-
             elif search_param == 'objectGUID':
                 # we can't escape the objectGUID query piece using filter_format
                 # because it replaces backslashes, which we need as a result
@@ -1045,29 +1044,29 @@ class LDAPUserFolder(BasicUserFolder):
                     filt_list.append('(objectGUID=%s)' % guid)
                 else:
                     filt_list.append('(objectGUID=*%s*)' % guid)
-
-            elif search_param is ANY:
-                filt_list.append('(|%s)' % "".join(
-                    filter_format('(%s=%s)', (param, search_term))
-                    for param in attrs
-                ))
             else:
-                # If the keyword arguments contain unknown items we will
-                # simply ignore them and continue looking.
-                ldap_param = schema_translator.get(search_param, None)
-                if ldap_param is None:
-                    continue
-
-                if search_term and exact_match:
-                    filt_list.append( filter_format( '(%s=%s)'
-                                                   , (ldap_param, search_term)
-                                                   ) )
-                elif search_term:
-                    filt_list.append( filter_format( '(%s=*%s*)'
-                                                   , (ldap_param, search_term)
-                                                   ) )
+                if exact_match:
+                    format_string = '(%s=%s)'
                 else:
-                    filt_list.append('(%s=*)' % ldap_param)
+                    format_string = '(%s=*%s*)'
+
+                if search_param is ANY:
+                    filt_list.append('(|%s)' % "".join(
+                        filter_format(format_string, (param, search_term))
+                        for param in attrs
+                    ))
+                else:
+                    # If the keyword arguments contain unknown items we will
+                    # simply ignore them and continue looking.
+                    ldap_param = schema_translator.get(search_param, None)
+                    if ldap_param is None:
+                        continue
+
+                    filt_list.append(
+                        filter_format(
+                            format_string, (ldap_param, search_term)
+                        ) if search_term else '(%s=*)' % ldap_param
+                    )
 
         if len(filt_list) == 0 and search_param != 'dn':
             # We have no useful filter criteria, bail now before bringing the
