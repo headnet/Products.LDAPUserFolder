@@ -284,7 +284,7 @@ class LDAPUserFolder(BasicUserFolder):
                 name, value, res['exception'] or 'n/a'
                 )
             logger.debug(msg)
-            return None, None, None, None
+            return res['exception'], None, None, None, None
 
         user_attrs = res['results'][0]
         dn = user_attrs.get('dn')
@@ -307,11 +307,11 @@ class LDAPUserFolder(BasicUserFolder):
                 # the password, I cannot do it myself.
                 try:
                     self._delegate.connect(bind_dn=utf8_dn, bind_pwd=pwd)
-                except:
+                except Exception as exc:
                     # Something went wrong, most likely bad credentials
                     msg = '_lookupuserbyattr: Binding as "%s" fails' % dn
                     logger.debug(msg)
-                    return None, None, None, None
+                    return exc, None, None, None, None
 
             logger.debug('_lookupuserbyattr: Re-binding as "%s"' % user_dn)
 
@@ -328,7 +328,7 @@ class LDAPUserFolder(BasicUserFolder):
                     dn, user_dn
                     )
                 logger.debug(msg)
-                return None, None, None, None
+                return auth_res['exception'], None, None, None, None
 
             user_attrs = auth_res['results'][0]
 
@@ -341,7 +341,7 @@ class LDAPUserFolder(BasicUserFolder):
         roles = self._mapRoles(groups)
         roles.extend(self._roles)
 
-        return roles, dn, user_attrs, groups
+        return None, roles, dn, user_attrs, groups
 
 
     security.declareProtected(manage_users, 'manage_reinit')
@@ -728,11 +728,22 @@ class LDAPUserFolder(BasicUserFolder):
                 logger.debug(msg)
                 return cached_user
 
-        user_roles, user_dn, user_attrs, ldap_groups = self \
+        exc, user_roles, user_dn, user_attrs, ldap_groups = self \
             ._lookupuserbyattr(name=name, value=value, pwd=pwd)
 
-        if user_dn is not None and ldap_groups is None:
-            cache = 0
+        # Never cache a lookup that threw an exception. Also, we try to
+        # fall back to a previously cached value.
+        if cache and exc:
+            cached_user = self._cache(cache_type).get(value, pwd, 0)
+            if cached_user:
+                logger.info(
+                    'getUserByAttr: "%s" cached in %s cache (fallback)' % (
+                        value, cache_type
+                    )
+                )
+                return cached_user
+            else:
+                cache = 0
 
         if user_dn is None:
             logger.debug('getUserByAttr: "%s=%s" not found' % (name, value))

@@ -32,8 +32,14 @@ class SimpleCache:
         self.cache[id] = object
 
 
-    def get(self, id, password=None):
-        """ Retrieve a cached object if it is valid """
+    def get(self, id, password=None, timeout=None):
+        """Retrieve a cached object if it is valid.
+
+        The time-to-live (timeout) value can be provided to override
+        the default, or a negative value (or zero) can be passed,
+        skipping the time-to-live check.
+        """
+
         try:
             id = id.lower()
         except AttributeError:
@@ -46,8 +52,13 @@ class SimpleCache:
              password != user._getPassword() ):
             user = None
 
+        if timeout is None:
+            timeout = self.timeout
+        elif timeout <= 0:
+            return user
+
         if ( user and 
-             (time.time() < user.getCreationTime().timeTime() + self.timeout) ):
+             (time.time() < user.getCreationTime().timeTime() + timeout) ):
             return user
         else:
             return None
