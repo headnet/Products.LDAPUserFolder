@@ -1312,7 +1312,7 @@ class LDAPUserFolder(BasicUserFolder):
             (Used e.g. in showgroups.dtml) or, if a DN is passed
             in, all groups for that particular DN.
         """
-        exc, groups = _lookupgroups(dn, attr, pwd)
+        exc, groups = self._lookupgroups(dn, attr, pwd)
         return groups or []
 
     security.declareProtected(manage_users, 'getGroupType')
