@@ -220,6 +220,91 @@ class LDAPUserFolder(BasicUserFolder):
         self._cache('negative').clear()
         self._misc_cache().clear()
 
+    security.declarePrivate('_lookupgroups')
+    def _lookupgroups(self, dn='*', attr=None, pwd=''):
+        """
+            returns a list of possible groups from the ldap tree
+            (Used e.g. in showgroups.dtml) or, if a DN is passed
+            in, all groups for that particular DN.
+        """
+
+        group_list = []
+        no_show = ('Anonymous', 'Authenticated', 'Shared')
+
+        if self._local_groups:
+            if dn != '*':
+                all_groups_list = self._groups_store.get(dn) or []
+            else:
+                all_groups_dict = {}
+                zope_roles = list(self.valid_roles())
+                zope_roles.extend(list(self._additional_groups))
+
+                for role_name in zope_roles:
+                    if role_name not in no_show:
+                        all_groups_dict[role_name] = 1
+
+                all_groups_list = all_groups_dict.keys()
+
+            for group in all_groups_list:
+                if attr is None:
+                    group_list.append((group, group))
+                else:
+                    group_list.append(group)
+
+            group_list.sort()
+
+        else:
+            gscope = self._delegate.getScopes()[self.groups_scope]
+
+            if dn != '*':
+                f_template = '(&(objectClass=%s)(%s=%s))'
+                group_filter = '(|'
+
+                for g_name, m_name in GROUP_MEMBER_MAP.items():
+                    fltr = filter_format(f_template, (g_name, m_name, dn))
+                    group_filter += fltr
+
+                group_filter += ')'
+
+            else:
+                group_filter = '(|'
+
+                for g_name in GROUP_MEMBER_MAP.keys():
+                    fltr = filter_format('(objectClass=%s)', (g_name,))
+                    group_filter += fltr
+
+                group_filter += ')'
+
+            res = self._delegate.search( base=self.groups_base
+                                       , scope=gscope
+                                       , filter=group_filter
+                                       , attrs=['cn']
+                                       , bind_dn=''
+                                       , bind_pwd=''
+                                       )
+
+            exc = res['exception']
+            if exc:
+                return exc, None
+
+            if res['size'] > 0:
+                res_dicts = res['results']
+                for i in range(res['size']):
+                    dn = res_dicts[i].get('dn')
+                    try:
+                        cn = res_dicts[i]['cn'][0]
+                    except KeyError:    # NDS oddity
+                        cn = self._delegate.explode_dn(dn, 1)[0]
+
+                    if attr is None:
+                        group_list.append((cn, dn))
+                    elif attr == 'cn':
+                        group_list.append(cn)
+                    elif attr == 'dn':
+                        group_list.append(dn)
+
+        return None, group_list
+
     security.declarePrivate('_lookupuserbyattr')
     def _lookupuserbyattr(self, name, value, pwd=None):
         """
@@ -337,12 +422,14 @@ class LDAPUserFolder(BasicUserFolder):
 
         logger.debug('_lookupuserbyattr: user_attrs %s' % str(user_attrs))
 
-        groups = list(self.getGroups(dn=dn, attr='cn', pwd=user_pwd))
-        roles = self._mapRoles(groups)
-        roles.extend(self._roles)
+        exc, groups = self._lookupgroups(dn=dn, attr='cn', pwd=user_pwd)
+        if groups:
+            roles = self._mapRoles(groups)
+            roles.extend(self._roles)
+        else:
+            roles = list(self._roles)
 
-        return None, roles, dn, user_attrs, groups
-
+        return exc, roles, dn, user_attrs, groups
 
     security.declareProtected(manage_users, 'manage_reinit')
     def manage_reinit(self, REQUEST=None):
@@ -1225,83 +1312,8 @@ class LDAPUserFolder(BasicUserFolder):
             (Used e.g. in showgroups.dtml) or, if a DN is passed
             in, all groups for that particular DN.
         """
-        group_list = []
-        no_show = ('Anonymous', 'Authenticated', 'Shared')
-
-        if self._local_groups:
-            if dn != '*':
-                all_groups_list = self._groups_store.get(dn) or []
-            else:
-                all_groups_dict = {}
-                zope_roles = list(self.valid_roles())
-                zope_roles.extend(list(self._additional_groups))
-
-                for role_name in zope_roles:
-                    if role_name not in no_show:
-                        all_groups_dict[role_name] = 1
-
-                all_groups_list = all_groups_dict.keys()
-
-            for group in all_groups_list:
-                if attr is None:
-                    group_list.append((group, group))
-                else:
-                    group_list.append(group)
-
-            group_list.sort()
-
-        else:
-            gscope = self._delegate.getScopes()[self.groups_scope]
-
-            if dn != '*':
-                f_template = '(&(objectClass=%s)(%s=%s))'
-                group_filter = '(|'
-
-                for g_name, m_name in GROUP_MEMBER_MAP.items():
-                    fltr = filter_format(f_template, (g_name, m_name, dn))
-                    group_filter += fltr
-
-                group_filter += ')'
-
-            else:
-                group_filter = '(|'
-
-                for g_name in GROUP_MEMBER_MAP.keys():
-                    fltr = filter_format('(objectClass=%s)', (g_name,))
-                    group_filter += fltr
-
-                group_filter += ')'
-
-            res = self._delegate.search( base=self.groups_base
-                                       , scope=gscope
-                                       , filter=group_filter
-                                       , attrs=['cn']
-                                       , bind_dn=''
-                                       , bind_pwd=''
-                                       )
-
-            exc = res['exception']
-            if exc:
-                return
-
-            if res['size'] > 0:
-                res_dicts = res['results']
-                for i in range(res['size']):
-                    dn = res_dicts[i].get('dn')
-                    try:
-                        cn = res_dicts[i]['cn'][0]
-                    except KeyError:    # NDS oddity
-                        cn = self._delegate.explode_dn(dn, 1)[0]
-
-                    if attr is None:
-                        group_list.append((cn, dn))
-                    elif attr == 'cn':
-                        group_list.append(cn)
-                    elif attr == 'dn':
-                        group_list.append(dn)
-
-        return group_list
-
+        exc, groups = _lookupgroups(dn, attr, pwd)
+        return groups or []
 
     security.declareProtected(manage_users, 'getGroupType')
     def getGroupType(self, group_dn):
