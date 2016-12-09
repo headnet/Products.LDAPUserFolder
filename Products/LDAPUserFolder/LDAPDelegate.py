@@ -454,7 +454,7 @@ class LDAPDelegate(Persistent):
         except Exception, e:
             msg = str(e)
             logger.error(msg, exc_info=1)
-            result['exception'] = msg
+            result['exception'] = msg or type(e).__name__
 
         elapsed = time.time() - t
         if elapsed > 1.0:
