@@ -338,7 +338,7 @@ class LDAPDelegate(Persistent):
 
         # Set the operations timeout
         if op_timeout > 0:
-            connection.timeout = op_timeout
+            connection.set_option(ldap.OPT_TIMEOUT, op_timeout)
 
         # Now bind with the credentials given. Let exceptions propagate out.
         connection.simple_bind_s(user_dn, user_pwd)
