@@ -828,9 +828,9 @@ class LDAPUserFolder(BasicUserFolder):
                         value, cache_type
                     )
                 )
-                return cached_user
-            else:
-                cache = 0
+
+            # Always return (even if none)
+            return cached_user
 
         if user_dn is None:
             logger.debug('getUserByAttr: "%s=%s" not found' % (name, value))
