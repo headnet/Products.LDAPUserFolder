@@ -320,7 +320,7 @@ class LDAPUserFolder(BasicUserFolder):
                 # up
                 msg = '_lookupuserbyattr: not a valid dn "%s"' % value
                 logger.debug(msg)
-                return None, None, None, None
+                return None, None, None, None, None
 
             users_base = to_utf8(value)
             search_str = '(objectClass=*)'
