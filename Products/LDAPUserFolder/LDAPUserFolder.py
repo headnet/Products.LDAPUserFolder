@@ -834,7 +834,7 @@ class LDAPUserFolder(BasicUserFolder):
 
         if user_dn is None:
             logger.debug('getUserByAttr: "%s=%s" not found' % (name, value))
-            if cache and not exc:
+            if cache:
                 self._cache('negative').set(
                     negative_cache_key, NonexistingUser()
                 )
@@ -872,8 +872,11 @@ class LDAPUserFolder(BasicUserFolder):
                     user_dn, self._login_attr
                     )
             logger.debug(msg)
-            self._cache('negative').set(negative_cache_key, NonexistingUser())
-            return None
+            if cache:
+                self._cache('negative').set(
+                    negative_cache_key, NonexistingUser()
+                )
+            return
 
         if self._uid_attr != 'dn' and len(uid) > 0:
             uid = uid[0]
@@ -882,8 +885,11 @@ class LDAPUserFolder(BasicUserFolder):
                     user_dn, self._uid_attr
                     )
             logger.debug(msg)
-            self._cache('negative').set(negative_cache_key, NonexistingUser())
-            return None
+            if cache:
+                self._cache('negative').set(
+                    negative_cache_key, NonexistingUser()
+                )
+            return
 
         user_obj = LDAPUser( uid
                            , login_name
