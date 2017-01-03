@@ -834,7 +834,7 @@ class LDAPUserFolder(BasicUserFolder):
 
         if user_dn is None:
             logger.debug('getUserByAttr: "%s=%s" not found' % (name, value))
-            if cache:
+            if cache and not exc:
                 self._cache('negative').set(
                     negative_cache_key, NonexistingUser()
                 )
