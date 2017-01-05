@@ -395,7 +395,11 @@ class LDAPDelegate(Persistent):
                     result_id
                 )
 
-                if result_type != ldap.RES_SEARCH_RESULT:
+                if result_type not in (
+                    ldap.RES_SEARCH_RESULT,
+                    ldap.RES_SEARCH_ENTRY
+                ):
+                    logger.info("Breaking on result_type: %d" % result_type)
                     break
 
                 i = 0
@@ -417,6 +421,14 @@ class LDAPDelegate(Persistent):
                     i += 1
 
                 count += i
+                result['size'] += count
+
+                # Always break after an entry type.
+                if result_type == ldap.RES_SEARCH_ENTRY:
+                    logger.info("Retrieved one entry; done (total: %d)." % (
+                        count,
+                    ))
+                    break
 
                 for ctrl in result_ctrls:
                     if ctrl.controlType == page_ctrl_oid and ctrl.cookie:
@@ -430,8 +442,6 @@ class LDAPDelegate(Persistent):
                         i, count
                     ))
                     break
-
-            result['size'] += count
 
         except ldap.INVALID_CREDENTIALS:
             msg = 'Invalid authentication credentials'
