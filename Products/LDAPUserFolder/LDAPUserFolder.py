@@ -1319,6 +1319,8 @@ class LDAPUserFolder(BasicUserFolder):
             in, all groups for that particular DN.
         """
         exc, groups = self._lookupgroups(dn, attr, pwd)
+        if exc is not None:
+            raise exc if isinstance(exc, Exception) else Exception(exc)
         return groups or []
 
     security.declareProtected(manage_users, 'getGroupType')
